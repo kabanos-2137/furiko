@@ -117,6 +117,43 @@ app.post('/get_settings', (req, res) => {
 	}); //Check if there are any results of the query and on this basis send data to user
 });
 
+app.post('/set_settings', (req, res) => {
+	//Data sent by user
+	let _userId = req.body.userId;
+	let _password = req.body.password;
+	let _deviceId = req.body.deviceId;
+	let _settings = req.body.settingsData;
+
+	let _userQuery = database.data.users.filter(el => //Find the user in db
+		el.id == _userId && //Check if the user id is valid
+		el.password == _password	//Check if the password is valid
+	);
+	let _deviceQuery = []; //Find the device
+
+	if(_userQuery.length > 0){
+		_deviceQuery = database.data.devices.filter(el => //Find the device
+			el.id == _deviceId && //Check if the device id is valid
+			el.permissions.filter(el => //Check if user has permission to this device
+				el.userId == _userId
+			)	
+		);
+
+		if(_deviceQuery.length > 0){
+			database.data.devices.find(el => {
+				return el.id == _deviceId
+			}).settings = _settings; //Change the settings to the new one
+			database.write(); //Save the database
+		}
+	}
+
+	let _valid = _userQuery.length > 0 && _deviceQuery.length > 0;
+
+	res.send({
+		correct: (_valid ? true : false),
+		settingsData: (_valid ? _deviceQuery[0].settings : undefined)
+	}); //Check if there are any results of the query and on this basis send data to user
+});
+
 app.listen(port, () => {
 	console.log(`App is running on port ${port}`)
 }) //Start app
