@@ -34,7 +34,7 @@ app.post('/login', (req, res) => { //Login Request
 		el.password == _password //Check if password is valid
 	);
 
-	let _valid = _query.length > 0
+	let _valid = _query.length > 0;
 
 	res.send({
 		correct: (_valid ? true : false),
@@ -73,13 +73,49 @@ app.post('/get_devices', (req, res) => {
 		}
 	}
 
-	let _valid = _userQuery.length > 0 && _devices.length > 0
+	let _valid = _userQuery.length > 0 && _devices.length > 0;
 
 	res.send({
 		correct: (_valid ? true : false),
 		devices: (_valid ? _devices : undefined)
 	}); // Check if there are any results of the query and on this basis send data to user
 })
+
+app.post('/get_settings', (req, res) => {
+	//Data sent by user
+	let _userId = req.body.userId;
+	let _password = req.body.password;
+	let _deviceId = req.body.deviceId;
+
+	let _userQuery = database.data.users.filter(el => //Find the user in db
+		el.id == _userId && //Check if the user id is valid
+		el.password == _password	//Check if the password is valid
+	);
+	let _deviceQuery = []; //Find the device
+	let _permissionsQuery = []; //Find permissions for device
+
+	if(_userQuery.length > 0){
+		_deviceQuery = database.data.devices.filter(el => //Find the device
+			el.id == _deviceId && //Check if the device id is valid
+			el.permissions.filter(el => //Check if user has permission to this device
+				el.userId == _userId
+			)	
+		);
+
+		_permissionsQuery = _deviceQuery[0].permissions.filter(el => //Find permissions for device
+			el.userId == _userId
+		);
+	}
+
+	let _valid = _userQuery.length > 0 && _deviceQuery.length > 0 && _permissionsQuery.length > 0;
+
+
+	res.send({
+		correct: (_valid ? true : false),
+		permissions: (_valid ? _permissionsQuery[0].type : undefined),
+		settingsData: (_valid ? _deviceQuery[0].settings : undefined)
+	}); //Check if there are any results of the query and on this basis send data to user
+});
 
 app.listen(port, () => {
 	console.log(`App is running on port ${port}`)
