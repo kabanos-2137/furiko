@@ -154,6 +154,67 @@ app.post('/set_settings', (req, res) => {
 	}); //Check if there are any results of the query and on this basis send data to user
 });
 
+app.post('/invite', (req, res) => {
+	//Data sent by user
+	let _userId = req.body.userId;
+	let _password = req.body.password;
+	let _code = req.body.code;
+
+	let _userQuery = database.data.users.filter(el => //Find the user in db
+		el.id == _userId && //Check if the user id is valid
+		el.password == _password	//Check if the password is valid
+	);
+	let _codeQuery = []; //Find the code
+	let _deviceQuery = []; //Find the device
+	let _permissionsQuery = []; //Find the permissions
+
+	if(_userQuery.length > 0){
+		_codeQuery = database.data.invites.filter(el =>  //Find the code
+			el.code == _code
+		);
+
+		if(_codeQuery.length > 0){
+			_deviceQuery = database.data.devices.filter(el => //Find the device
+				el.id == _codeQuery[0].deviceId
+			);
+
+			if(_deviceQuery.length > 0){
+				_permissionsQuery = _deviceQuery[0].permissions.filter(el => //Check if user already has permissions for this device
+					el.userId == _userId
+				)
+
+				if(_permissionsQuery.length == 0){
+					_deviceQuery[0].permissions.push({ //Update permissions for a device
+						userId: _userId,
+						type: (_code.toString()[0] == "0" ? "admin" : "user")
+					});
+				}
+
+				if(_code.toString()[0] == "0"){ //If it is a admin invite, it is immediatly deleted
+					database.data.invites = database.data.invites.filter(el => 
+						el.code != _code
+					);
+					database.write();
+				}else{ //If it is a user invite, it is deleted after 24 hours
+					setTimeout(() => {
+						database.data.invites = database.data.invites.filter(el => 
+							el.code != _code
+						);
+						database.write();
+					}, 1440000)
+				}
+			}
+		}
+	}
+
+	let _valid = _userQuery.length > 0 && _codeQuery.length > 0 && _deviceQuery.length > 0 && _permissionsQuery.length == 0;
+
+	res.send({
+		correct: (_valid ? true : false),
+		deviceId: (_valid ? _deviceQuery[0].id : undefined)
+	}); //Check if there are any results of the query and on this basis send data to user
+});
+
 app.listen(port, () => {
 	console.log(`App is running on port ${port}`)
 }) //Start app
