@@ -1,0 +1,25 @@
+{
+	"users": [
+		{
+			"id": 1,
+			"username": "uwu",
+			"password": "sex"
+		}
+	],
+	"devices": [
+		{
+			"id": 1,
+			"permissions": [
+				{
+					"userId": 1,
+					"type": "admin"
+				}
+			],
+			"settings": {
+				"unit": "metric",
+				"name": "New Furiko"
+			}
+		}
+	],
+	"invites": []
+}
