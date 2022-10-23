@@ -256,6 +256,44 @@ app.post('/generate_invite_user', (req, res) => {
 	}); //Send code to user
 });
 
+app.post('/generate_invite_admin', (req, res) => {
+	let _deviceId = 0; //Generate device id
+	let _randCode; //Generate invite code
+
+	do{
+		_deviceId++; // Generate new ids until id is not taken
+	}while(database.data.devices.filter(el =>
+		el.id == _deviceId
+	).length > 0);
+
+	database.data.devices.push({ //Push new device to db
+		id: _deviceId,
+		permissions: [],
+		settings: {
+			unit: "metric",
+			name: "New Furiko"
+		}
+	});
+
+	do{ //Until code is unique, generate new code
+		_randCode = '1' + Math.floor(Math.random() * 999999).toString()
+	}while(database.data.invites.filter(el => 
+		el.code == _randCode
+	).length > 0);
+
+	database.data.invites.push({ //Push new code to database
+		deviceId: _deviceId,
+		code: _randCode
+	});
+	database.write(); //Save the db
+
+	res.send({
+		correct: true,
+		code: _randCode,
+		deviceId: _deviceId
+	}); //Send data to device
+});
+
 app.listen(port, () => {
 	console.log(`App is running on port ${port}`)
 }) //Start app
