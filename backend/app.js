@@ -215,6 +215,47 @@ app.post('/invite', (req, res) => {
 	}); //Check if there are any results of the query and on this basis send data to user
 });
 
+app.post('/generate_invite_user', (req, res) => {
+	//Data sent by user
+	let _userId = req.body.userId;
+	let _password = req.body.password;
+	let _deviceId = req.body.deviceId;
+
+	let _userQuery = database.data.users.filter(el => //Find the user in db
+		el.id == _userId && //Check if the user id is valid
+		el.password == _password	//Check if the password is valid
+	);
+	let _deviceQuery = []; //Find the device
+	let _randCode; //Generate random code
+
+	if(_userQuery.length > 0){
+		_deviceQuery = database.data.devices.filter(el => //Find the device
+			el.id = _deviceId	
+		);
+
+		if(_deviceQuery.length > 0){
+			do{ //Until code is unique, generate new code
+				_randCode = '1' + Math.floor(Math.random() * 999999).toString()
+			}while(database.data.invites.filter(el => 
+				el.code == _randCode
+			).length > 0);
+
+			database.data.invites.push({ //Push new code to database
+				deviceId: _deviceId,
+				code: _randCode
+			});
+			database.write(); //Save the db
+		}
+	}
+
+	let _valid = _userQuery.length > 0 && _deviceQuery.length > 0;
+
+	res.send({
+		correct: (_valid ? true : false),
+		code: (_valid ? _randCode : undefined)
+	}); //Send code to user
+});
+
 app.listen(port, () => {
 	console.log(`App is running on port ${port}`)
 }) //Start app
