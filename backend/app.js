@@ -294,6 +294,31 @@ app.post('/generate_invite_admin', (req, res) => {
 	}); //Send data to device
 });
 
+app.post('/set_data', (req, res) => {
+	//Data sent by user
+	let _deviceId = req.params.deviceId;
+	let _data = req.body.data;
+	
+	let _deviceQuery = database.data.devices.filter(el => //Find the device
+		el.id == _deviceId	
+	);
+	
+	if(_deviceQuery.length > 0) {
+		if(_deviceQuery[0].data.length > 75){ //Check if there are too many data entries
+			database.data.devices.find(el => { return el.id == _deviceId }).dataFromDevice.shift();//Remove the excess
+		}
+
+		database.data.devices.find(el => { return el.id == _deviceId }).dataFromDevice.push(_data); //Push the data
+		database.write(); //Save the db
+	}
+
+	let _valid = _deviceQuery.length > 0
+
+	res.send({
+		correct: (_valid ? true : false)
+	}); //Send information about correctness of the process
+});
+
 app.listen(port, () => {
 	console.log(`App is running on port ${port}`)
 }) //Start app
