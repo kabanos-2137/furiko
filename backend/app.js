@@ -186,11 +186,11 @@ app.post('/invite', (req, res) => {
 				if(_permissionsQuery.length == 0){
 					_deviceQuery[0].permissions.push({ //Update permissions for a device
 						userId: _userId,
-						type: (_code.toString()[0] == "0" ? "admin" : "user")
+						type: (_code.toString()[0] == "1" ? "admin" : "user")
 					});
 				}
 
-				if(_code.toString()[0] == "0"){ //If it is a admin invite, it is immediatly deleted
+				if(_code.toString()[0] == "1"){ //If it is a admin invite, it is immediatly deleted
 					database.data.invites = database.data.invites.filter(el => 
 						el.code != _code
 					);
@@ -230,12 +230,16 @@ app.post('/generate_invite_user', (req, res) => {
 
 	if(_userQuery.length > 0){
 		_deviceQuery = database.data.devices.filter(el => //Find the device
-			el.id = _deviceId	
+			el.id = _deviceId &&
+			el.permissions.filter(el => 
+				el.type == "admin" &&
+				el.userId == _userId
+			).length > 0
 		);
 
 		if(_deviceQuery.length > 0){
 			do{ //Until code is unique, generate new code
-				_randCode = '1' + Math.floor(Math.random() * 999999).toString()
+				_randCode = '0' + Math.floor(Math.random() * 999999).toString()
 			}while(database.data.invites.filter(el => 
 				el.code == _randCode
 			).length > 0);
