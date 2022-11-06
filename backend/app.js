@@ -300,7 +300,7 @@ app.post('/generate_invite_admin', (req, res) => {
 
 app.post('/set_data', (req, res) => {
 	//Data sent by user
-	let _deviceId = req.params.deviceId;
+	let _deviceId = req.body.deviceId;
 	let _data = req.body.data;
 	
 	let _deviceQuery = database.data.devices.filter(el => //Find the device
@@ -322,6 +322,39 @@ app.post('/set_data', (req, res) => {
 		correct: (_valid ? true : false)
 	}); //Send information about correctness of the process
 });
+
+app.post('/get_data', (req, res) => {
+	//Data sent by user
+	let _userId = req.body.userId;
+	let _password = req.body.password;
+	let _deviceId = req.body.deviceId;
+
+	let _userQuery = database.data.users.filter(el => //Find the user in db
+		el.id == _userId && //Check if the user id is valid
+		el.password == _password	//Check if the password is valid
+	);
+	let _deviceQuery = []; //Find the device
+	let _dataQuery; //Get the data
+
+	if(_userQuery.length > 0){
+		_deviceQuery = database.data.devices.filter(el => //Find the device
+			el.id = _deviceId &&
+			el.permissions.filter(el => 
+				el.userId == _userId
+			).length > 0
+		);
+
+		if(_deviceQuery.length > 0){
+			_dataQuery = _deviceQuery[0].data.slice(-1)[0]; // Get data from db
+		}
+	}
+
+	let _valid = _userQuery.length > 0 && _deviceQuery.length > 0 && _dataQuery != undefined;
+	res.send({
+		correct: (_valid ? true : false),
+		data: (_valid ? _dataQuery : undefined)
+	}); //Send code to user
+})
 
 app.listen(port, () => {
 	console.log(`App is running on port ${port}`)
