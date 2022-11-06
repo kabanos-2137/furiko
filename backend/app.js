@@ -3,9 +3,12 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
+import * as dotenv from 'dotenv';
+
+dotenv.config() //Initialize enviromental variables
 
 const app = express(); //Initialize app
-const port = 8079; //Set app port
+const port = process.env.PORT; //Set app port
 
 const database = new Low(
 	new JSONFile(
