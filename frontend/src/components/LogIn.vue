@@ -2,17 +2,44 @@
     <div id="log-in-container">
         <input type="text" v-model="username" placeholder="username"/>
         <input type="password" v-model="password" placeholder="password"/>
-        <input type="submit" value="Log In"/>
+        <input type="submit" value="Log In" @click="logIn"/>
     </div> 
 </template>
 
 <script>
+    import axios from 'axios'
+
     export default {
         name: 'LogIn',
         data(){
             return{
                 username: "",
                 password: ""
+            }
+        },
+        methods: {
+            logIn(){
+                const data = {
+                    username: this.username,
+                    password: this.password
+                }
+
+                const headers = {}
+
+                axios.post("http://localhost:8080/login/", data, { headers })
+                    .then(response => {
+                        let _correct = response.data.correct
+                        if(_correct){
+                            this.updatePassword(this.password)
+                            this.updateUserId(response.data.id)
+                        }
+                    })
+            },
+            updatePassword(password){
+                this.$emit('updatePassword', password)
+            },
+            updateUserId(userId){
+                this.$emit('updateUserId', userId)
             }
         }
     }
