@@ -1,7 +1,7 @@
 <template>
   <div id="container">
-    <TitleBarVue/>
-    <LogInVue/>
+    <TitleBarVue v-on:updatePassword="updatePassword" v-on:updateUserId="updateUserId"/>
+    <LogInVue v-on:updatePassword="updatePassword" v-on:updateUserId="updateUserId"/>
   </div>
 </template>
 
@@ -14,7 +14,21 @@
     components: {
       TitleBarVue,
       LogInVue
-    }
+    },
+    data(){
+      return{
+        userId: "",
+        password: ""
+      }
+    },
+    methods: {
+      updatePassword(password){
+        this.password = password
+      },
+      updateUserId(userId){
+        this.userId = userId
+      }
+    }  
   }
 </script>
 
