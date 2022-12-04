@@ -1,24 +1,28 @@
 <template>
   <div id="container">
-    <TitleBarVue v-on:updatePassword="updatePassword" v-on:updateUserId="updateUserId"/>
-    <LogInVue v-on:updatePassword="updatePassword" v-on:updateUserId="updateUserId"/>
+    <TitleBarVue :userId="userId" :password="password" :username="username"/>
+    <LogInVue v-if="(!userId || !password)" v-on:updatePassword="updatePassword" v-on:updateUserId="updateUserId" v-on:updateUsername="updateUsername"/>
+    <MainMenuVue v-else/>
   </div>
 </template>
 
 <script>
   import TitleBarVue from './components/TitleBar.vue';
   import LogInVue from './components/LogIn.vue'
+  import MainMenuVue from './components/MainMenu.vue'
 
   export default {
     name: 'App',
     components: {
       TitleBarVue,
-      LogInVue
+      LogInVue,
+      MainMenuVue
     },
     data(){
       return{
         userId: "",
-        password: ""
+        password: "",
+        username: ""
       }
     },
     methods: {
@@ -27,6 +31,9 @@
       },
       updateUserId(userId){
         this.userId = userId
+      },
+      updateUsername(username){
+        this.username = username
       }
     }  
   }
@@ -35,5 +42,6 @@
 <style>
   body, html{
     background-color: #5c5c5c;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   }
 </style>
