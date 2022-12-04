@@ -1,13 +1,15 @@
 <template>
     <div id="title-bar">
         <p id="title-paragraph">Furiko</p>
-        <p id="subtitle-paragraph">Welcome Back</p>
+        <p v-if="(!userId || !password)" id="subtitle-paragraph">Welcome Back</p>
+        <p v-else id="subtitle-paragraph">Hello, {{username}}!</p>
     </div>
 </template>
 
 <script>
     export default {
-        name: 'TitleBar'
+        name: 'TitleBar',
+        props: ['userId', 'password', 'username']
     }
 </script>
 

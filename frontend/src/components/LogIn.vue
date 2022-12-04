@@ -26,12 +26,13 @@
 
                 const headers = {}
 
-                axios.post("http://localhost:8080/login/", data, { headers })
+                axios.post("http://localhost:1503/login/", data, { headers })
                     .then(response => {
                         let _correct = response.data.correct
                         if(_correct){
                             this.updatePassword(this.password)
                             this.updateUserId(response.data.id)
+                            this.updateUsername(this.username)
                         }
                     })
             },
@@ -40,6 +41,9 @@
             },
             updateUserId(userId){
                 this.$emit('updateUserId', userId)
+            },
+            updateUsername(username){
+                this.$emit('updateUsername', username)
             }
         }
     }
