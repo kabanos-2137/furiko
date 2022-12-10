@@ -237,8 +237,6 @@ app.post('/verif', (req, res) => {
 			el.code == _code
 		);
 
-		console.log(_codeQuery)
-
 		if(_codeQuery.length > 0){
 			if(_codeQuery[0].code.toString()[0] == "2"){
 				database.data.invites = database.data.invites.filter(el =>  //Find the code
@@ -457,7 +455,12 @@ app.post('/create_acc', async (req, res) => {
 						pass: process.env.MAILPASS
 					}
 				});
-				//TO
+				
+				await _transporter.sendMail({
+					to: _email, // list of receivers
+					subject: "Code ✔", // Subject line
+					html: `Code: <a href="http://localhost:1503/?code=${Buffer.from(_randCode).toString("base64")}">http://localhost:1503/?code=${Buffer.from(_randCode).toString("base64")}</a>`, // html body
+				});
 			}else{
 				_wrong = 2;
 			}
