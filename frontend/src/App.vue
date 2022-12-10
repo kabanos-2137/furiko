@@ -1,7 +1,8 @@
 <template>
   <div id="container">
     <TitleBarVue :userId="userId" :password="password" :username="username"/>
-    <LogInVue v-if="(!userId || !password)" v-on:updatePassword="updatePassword" v-on:updateUserId="updateUserId" v-on:updateUsername="updateUsername"/>
+    <LogInVue v-if="((!userId || !password) && !(code))" v-on:updatePassword="updatePassword" v-on:updateUserId="updateUserId" v-on:updateUsername="updateUsername"/>
+    <VerifCodeVue v-else-if="(codeExists)" :code="code" v-on:verifEnded="verifEnded"/>
     <MainMenuVue v-else/>
   </div>
 </template>
@@ -10,19 +11,32 @@
   import TitleBarVue from './components/TitleBar.vue';
   import LogInVue from './components/LogIn.vue'
   import MainMenuVue from './components/MainMenu.vue'
+  import VerifCodeVue from './components/VerifCode.vue'
+  import { Buffer } from 'buffer';
 
   export default {
     name: 'App',
     components: {
       TitleBarVue,
       LogInVue,
-      MainMenuVue
+      MainMenuVue,
+      VerifCodeVue
     },
     data(){
       return{
         userId: "",
         password: "",
-        username: ""
+        username: "",
+        code: 0,
+        codeExists: false
+      }
+    },
+    mounted() {
+      let uri = window.location.search.substring(1); 
+      let params = new URLSearchParams(uri);
+      if(params.get("code")){
+        this.code = Buffer.from(params.get("code"), 'base64')
+        this.codeExists = true
       }
     },
     methods: {
@@ -34,6 +48,9 @@
       },
       updateUsername(username){
         this.username = username
+      },
+      verifEnded(){
+        this.codeExists = false
       }
     }  
   }

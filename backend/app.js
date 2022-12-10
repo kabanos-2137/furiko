@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
 import * as dotenv from 'dotenv';
+import nodemailer from 'nodemailer'
 
 dotenv.config() //Initialize enviromental variables
 
@@ -23,7 +24,7 @@ app.use(bodyParser.json());
 await database.read(); //Get database
 database.data ||= {} //Set database if empty
 
-app.post('/test', (req, res) => { //Test database
+app.post('/', (req, res) => { //Test database
 	res.send(database.data); //Send database data
 });
 
@@ -177,34 +178,36 @@ app.post('/invite', (req, res) => {
 		);
 
 		if(_codeQuery.length > 0){
-			_deviceQuery = database.data.devices.filter(el => //Find the device
-				el.id == _codeQuery[0].deviceId
-			);
+			if(_codeQuery[0].deviceId){
+				_deviceQuery = database.data.devices.filter(el => //Find the device
+					el.id == _codeQuery[0].deviceId
+				);
 
-			if(_deviceQuery.length > 0){
-				_permissionsQuery = _deviceQuery[0].permissions.filter(el => //Check if user already has permissions for this device
-					el.userId == _userId
-				)
-
-				if(_permissionsQuery.length == 0){
-					_deviceQuery[0].permissions.push({ //Update permissions for a device
-						userId: _userId,
-						type: (_code.toString()[0] == "1" ? "admin" : "user")
-					});
-				}
-
-				if(_code.toString()[0] == "1"){ //If it is a admin invite, it is immediatly deleted
-					database.data.invites = database.data.invites.filter(el => 
-						el.code != _code
-					);
-					database.write();
-				}else{ //If it is a user invite, it is deleted after 24 hours
-					setTimeout(() => {
+				if(_deviceQuery.length > 0){
+					_permissionsQuery = _deviceQuery[0].permissions.filter(el => //Check if user already has permissions for this device
+						el.userId == _userId
+					)
+	
+					if(_permissionsQuery.length == 0){
+						_deviceQuery[0].permissions.push({ //Update permissions for a device
+							userId: _userId,
+							type: (_code.toString()[0] == "1" ? "admin" : "user")
+						});
+					}
+	
+					if(_code.toString()[0] == "1"){ //If it is a admin invite, it is immediatly deleted
 						database.data.invites = database.data.invites.filter(el => 
 							el.code != _code
 						);
 						database.write();
-					}, 1440000)
+					}else{ //If it is a user invite, it is deleted after 24 hours
+						setTimeout(() => {
+							database.data.invites = database.data.invites.filter(el => 
+								el.code != _code
+							);
+							database.write();
+						}, 1440000)
+					}
 				}
 			}
 		}
@@ -217,6 +220,42 @@ app.post('/invite', (req, res) => {
 		deviceId: (_valid ? _deviceQuery[0].id : undefined)
 	}); //Check if there are any results of the query and on this basis send data to user
 });
+
+app.post('/verif', (req, res) => {
+	let _userId = req.body.userId;
+	let _password = req.body.password;
+	let _code = Buffer.from(req.body.code, 'base64');
+
+	let _userQuery = database.data.users.filter(el => //Find the user in db
+		el.id == _userId && //Check if the user id is valid
+		el.password == _password	//Check if the password is valid
+	);
+	let _codeQuery = []
+
+	if(_userQuery.length > 0){
+		_codeQuery = database.data.invites.filter(el =>  //Find the code
+			el.code == _code
+		);
+
+		console.log(_codeQuery)
+
+		if(_codeQuery.length > 0){
+			if(_codeQuery[0].code.toString()[0] == "2"){
+				database.data.invites = database.data.invites.filter(el =>  //Find the code
+					el.code != _code
+				);
+				database.data.users.find(el => { return el.id == _userId }).verified = true
+				database.write();
+			}
+		}
+	}
+
+	let _valid = _userQuery.length > 0 && _codeQuery.length > 0 && _codeQuery[0].code.toString()[0] == "2";
+
+	res.send({
+		correct: (_valid ? true : false)
+	})
+})
 
 app.post('/generate_invite_user', (req, res) => {
 	//Data sent by user
@@ -357,6 +396,84 @@ app.post('/get_data', (req, res) => {
 		correct: (_valid ? true : false),
 		data: (_valid ? _dataQuery : undefined)
 	}); //Send code to user
+})
+
+app.post('/create_acc', async (req, res) => {
+	//Data sent by user
+	let _username = req.body.username;
+	let _password = req.body.password;
+	let _confPassword = req.body.confPassword;
+	let _email = req.body.email;
+
+	let _query = [];
+	let _wrong = 0;
+	let _userId;
+
+	if(_username && _password && _confPassword && _email){
+		if(_password == _confPassword){
+			_query = database.data.users.filter(el => 
+				el.username == _username ||
+				el.email == _email
+			)
+	
+			if(_query.length == 0){
+				_userId = 0;
+	
+				do{
+					_userId++; // Generate new ids until id is not taken
+				}while(database.data.users.filter(el =>
+					el.id == _userId
+				).length > 0);
+	
+				database.data.users.push({
+					id: _userId,
+					username: _username,
+					password: _password,
+					email: _email,
+					verified: false
+				})
+
+				let _randCode;
+
+				do{ //Until code is unique, generate new code
+					_randCode = '2' + Math.floor(Math.random() * 999999).toString()
+				}while(database.data.invites.filter(el => 
+					el.code == _randCode
+				).length > 0);
+
+				database.data.invites.push({
+					userId: _userId,
+					code: _randCode
+				})
+
+				database.write();
+
+				let _transporter = nodemailer.createTransport({
+					host: "smtp.gmail.com",
+					port: 587,
+					secure: false,
+					auth: {
+						user: process.env.MAILUSER,
+						pass: process.env.MAILPASS
+					}
+				});
+				//TO
+			}else{
+				_wrong = 2;
+			}
+		}else{
+			_wrong = 1;
+		}
+	}else{
+		_wrong = 3;
+	}
+
+	let _valid = _username && _password && _confPassword && _email && _password == _confPassword && _query.length == 0;
+	res.send({
+		correct: (_valid ? true : false),
+		wrong: (!_valid ? _wrong : undefined),
+		userId: (_valid ? _userId : undefined)
+	});
 })
 
 app.listen(port, () => {
