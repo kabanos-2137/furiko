@@ -37,6 +37,7 @@
       if(params.get("code")){
         this.code = Buffer.from(params.get("code"), 'base64')
         this.codeExists = true
+        console.log(this)
       }
     },
     methods: {
@@ -50,6 +51,10 @@
         this.username = username
       },
       verifEnded(){
+        this.userId = ""
+        this.password = ""
+        this.username = ""
+        this.code = 0
         this.codeExists = false
       }
     }  

@@ -4,6 +4,8 @@
         <input type="password" v-model="password" placeholder="Password"/>
         <input type="submit" value="Log In" @click="logIn"/>
         <a id="log-in-create-acc" v-on:click="(createAcc=true)">Don't have an account</a>
+        <p v-if="(loginErr == 1)" id="err">Wrong username or password</p>
+        <p v-else-if="(loginErr == 2)" id="err">Please verify your e-mail</p>
     </div> 
     <div v-else-if="(createAcc && !accCreated)" id="create-acc-container">
         <input type="text" v-model="newUsername" placeholder="Username"/>
@@ -37,7 +39,8 @@
                 newPassword: "",
                 newPasswordConfirm: "",
                 newEmail: "",
-                accCreateErr: 0
+                accCreateErr: 0,
+                loginErr: 0
             }
         },
         methods: {
@@ -54,6 +57,8 @@
                             this.updatePassword(this.password)
                             this.updateUserId(response.data.id)
                             this.updateUsername(this.username)
+                        }else{
+                            this.loginErr = response.data.wrong
                         }
                     })
             },
@@ -85,6 +90,7 @@
                 this.newPasswordConfirm = ""
                 this.newEmail = ""
                 this.accCreateErr = 0
+                this.loginErr = false
             },
             updatePassword(password){
                 this.$emit('updatePassword', password)

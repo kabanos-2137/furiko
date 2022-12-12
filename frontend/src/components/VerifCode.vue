@@ -1,9 +1,16 @@
 <template>
-  <div id="verif-container">
+  <div v-if="(verifErr < 0)" id="verif-container">
     <input type="text" :value="code" disabled/>
     <input type="text" v-model="username" placeholder="Username"/>
     <input type="password" v-model="password" placeholder="Password"/>
     <input type="submit" value="Verify" @click="verif"/>
+    <p v-if="(verifErr == 1)" id="err">Wrong username or password</p>
+    <p v-else-if="(verifErr == 2)" id="err">Code not found</p>
+    <p v-else-if="(verifErr == 3)" id="err">Code is not valid</p>
+  </div>
+  <div v-else>
+    <p id="verif-info">Verification ended succesfully. </p>
+    <p id="back-button" @click="endVerif">Back</p>
   </div>
 </template>
 
@@ -16,31 +23,29 @@
     data(){
       return{
         username: '',
-        password: ''
+        password: '',
+        verifErr: -1
       }
     },
     methods: {
       verif(){
         let data = {
           username: this.username,
-          password: this.password
+          password: this.password,
+          code: this.code
         }
 
-        axios.post("http://localhost:1503/login/", data)
+        axios.post("http://localhost:1503/verif", data)
           .then(response => {
-            let _correct = response.data.correct
-            if(_correct){
-              data = {
-                userId: response.data.id,
-                password: this.password,
-                code: this.code
-              }
-              axios.post("http://localhost:1503/verif", data)
-                .then(response => {
-                  if(response.data.correct) this.$emit("verifEnded")
-                })
-            }
+            if(response.data.correct) this.verifErr = 0
+            else this.verifErr = response.data.wrong
           })
+      },
+      endVerif(){
+        this.username = ''
+        this.password = ''
+        this.verifErr = -1
+        this.$emit("verifEnded");
       }
     }
   }
@@ -94,5 +99,26 @@
 
   #verif-container > input:hover::placeholder{
     color: black
+  }
+
+  #back-button{
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: auto;
+    text-align: center;
+    padding-bottom: 10px;
+    text-decoration: underline;
+    color: rgb(82, 163, 198);
+  }
+
+  #verif-info{
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: auto;
+    text-align: center;
+    padding-bottom: 10px;
+    color: rgb(82, 163, 198);
   }
 </style>

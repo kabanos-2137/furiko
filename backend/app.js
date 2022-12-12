@@ -33,16 +33,24 @@ app.post('/login', (req, res) => { //Login Request
 	let _username = req.body.username;
 	let _password = req.body.password;
 
+	let _wrong = 0
+
 	let _query = database.data.users.filter(el => //Find the user in db
 		el.username == _username && //Check if username is valid
-		el.password == _password //Check if password is valid
+		el.password == _password//Check if password is valid
 	);
 
-	let _valid = _query.length > 0;
+	if(_query.length <= 0){
+		_wrong = 1
+	}else if(!_query[0].verified){
+		_wrong = 2
+	}
 
+	let _valid = _query.length > 0 && _query[0].verified
 	res.send({
 		correct: (_valid ? true : false),
-		id: (_valid ? _query[0].id : undefined)
+		id: (_valid ? _query[0].id : undefined),
+		wrong: (!_valid ? _wrong : undefined),
 	}); //Check if there are any results of the query and on this basis send data to user
 });
 
@@ -222,19 +230,21 @@ app.post('/invite', (req, res) => {
 });
 
 app.post('/verif', (req, res) => {
-	let _userId = req.body.userId;
+	let _username = req.body.username;
 	let _password = req.body.password;
 	let _code = Buffer.from(req.body.code, 'base64');
 
 	let _userQuery = database.data.users.filter(el => //Find the user in db
-		el.id == _userId && //Check if the user id is valid
+		el.username == _username && //Check if the user id is valid
 		el.password == _password	//Check if the password is valid
 	);
 	let _codeQuery = []
+	let _wrong = 0
 
 	if(_userQuery.length > 0){
 		_codeQuery = database.data.invites.filter(el =>  //Find the code
-			el.code == _code
+			el.code == _code &&
+			_userQuery[0].id == el.userId
 		);
 
 		if(_codeQuery.length > 0){
@@ -242,16 +252,23 @@ app.post('/verif', (req, res) => {
 				database.data.invites = database.data.invites.filter(el =>  //Find the code
 					el.code != _code
 				);
-				database.data.users.find(el => { return el.id == _userId }).verified = true
+				database.data.users.find(el => { return el.username == _username }).verified = true
 				database.write();
+			}else{
+				_wrong = 3;
 			}
+		}else{
+			_wrong = 2;
 		}
+	}else{
+		_wrong = 1;
 	}
 
 	let _valid = _userQuery.length > 0 && _codeQuery.length > 0 && _codeQuery[0].code.toString()[0] == "2";
 
 	res.send({
-		correct: (_valid ? true : false)
+		correct: (_valid ? true : false),
+		wrong: (!_valid ? _wrong : undefined),
 	})
 })
 
