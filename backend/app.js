@@ -5,6 +5,7 @@ import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
 import * as dotenv from 'dotenv';
 import nodemailer from 'nodemailer'
+import cors from 'cors'
 
 dotenv.config() //Initialize enviromental variables
 
@@ -20,6 +21,7 @@ const database = new Low(
 //Use body parser
 app.use(bodyParser.urlencoded({ extended: false })); 
 app.use(bodyParser.json());
+app.use(cors())
 
 await database.read(); //Get database
 database.data ||= {} //Set database if empty

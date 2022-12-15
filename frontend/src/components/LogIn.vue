@@ -50,7 +50,7 @@
                     password: this.password
                 }
 
-                axios.post("http://localhost:1503/login/", data)
+                axios.post("http://localhost:1501/login/", data)
                     .then(response => {
                         let _correct = response.data.correct
                         if(_correct){
@@ -70,7 +70,7 @@
                     email: this.newEmail
                 }
 
-                axios.post("http://localhost:1503/create_acc/", data)
+                axios.post("http://localhost:1501/create_acc/", data)
                     .then(response => {
                         let _correct = response.data.correct
                         if(_correct){

@@ -35,7 +35,7 @@
           code: this.code
         }
 
-        axios.post("http://localhost:1503/verif", data)
+        axios.post("http://localhost:1501/verif", data)
           .then(response => {
             if(response.data.correct) this.verifErr = 0
             else this.verifErr = response.data.wrong
