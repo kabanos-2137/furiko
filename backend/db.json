@@ -1,0 +1,47 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "uwu",
+      "password": "sex",
+      "email": "test@furi.ko",
+      "verified": true
+    },
+    {
+      "id": 2,
+      "username": "owo",
+      "password": "sex",
+      "email": "a@a.a",
+      "verified": false
+    }
+  ],
+  "invites": [
+    {
+      "id": 2,
+      "code": "293888"
+    }
+  ],
+  "devices": [
+    {
+      "id": 1,
+      "permissions": [
+        {
+          "userId": "1",
+          "type": "admin"
+        }
+      ],
+      "settings": {
+        "unit": "imperial",
+        "name": "Test Furiko"
+      }
+    },
+    {
+      "id": "2",
+      "permissions": [],
+      "settings": {
+        "unit": "metric",
+        "name": "New Furiko"
+      }
+    }
+  ]
+}

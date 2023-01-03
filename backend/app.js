@@ -1,503 +1,408 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 //imports
 import express from 'express';
-import bodyParser from 'body-parser';
+import dotenv from 'dotenv';
 import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
-import * as dotenv from 'dotenv';
-import nodemailer from 'nodemailer'
-import cors from 'cors'
-
-dotenv.config() //Initialize enviromental variables
-
-const app = express(); //Initialize app
-const port = process.env.PORT; //Set app port
-
-const database = new Low(
-	new JSONFile(
-		'./data.json'
-	)
-); //Initialize database
-
-//Use body parser
-app.use(bodyParser.urlencoded({ extended: false })); 
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import nodemailer from 'nodemailer';
+dotenv.config();
+const app = express();
+const port = Number(process.env.PORT);
+const adapter = new JSONFile('db.json');
+const db = new Low(adapter);
+db.read();
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
-app.use(cors())
-
-await database.read(); //Get database
-database.data ||= {} //Set database if empty
-
-app.post('/', (req, res) => { //Test database
-	res.send(database.data); //Send database data
+app.use(cors());
+app.post('/', (req, res) => {
+    res.send(db.data);
 });
-
-app.post('/login', (req, res) => { //Login Request
-	//Data sent by user
-	let _username = req.body.username;
-	let _password = req.body.password;
-
-	let _wrong = 0
-
-	let _query = database.data.users.filter(el => //Find the user in db
-		el.username == _username && //Check if username is valid
-		el.password == _password//Check if password is valid
-	);
-
-	if(_query.length <= 0){
-		_wrong = 1
-	}else if(!_query[0].verified){
-		_wrong = 2
-	}
-
-	let _valid = _query.length > 0 && _query[0].verified
-	res.send({
-		correct: (_valid ? true : false),
-		id: (_valid ? _query[0].id : undefined),
-		wrong: (!_valid ? _wrong : undefined),
-	}); //Check if there are any results of the query and on this basis send data to user
+app.post('/login', (req, res) => {
+    let wrong = 0;
+    let query = db.data.users.filter(el => el.username == req.body.username && el.password == req.body.password);
+    if (query.length <= 0) {
+        wrong = 1;
+    }
+    else if (!query[0].verified) {
+        wrong = 2;
+    }
+    let valid = query.length > 0 && query[0].verified;
+    res.send({
+        correct: valid,
+        id: (valid ? query[0].id : undefined),
+        wrong: (valid ? undefined : wrong)
+    });
 });
-
 app.post('/get_devices', (req, res) => {
-	//Data sent by user
-	let _userId = req.body.userId;
-	let _password = req.body.password;
-
-	let _userQuery = database.data.users.filter(el => //Find the user in db
-		el.password == _password && //Check if password is valid
-		el.id == _userId //Check if user id is valid
-	);
-	let _devicesQuery = [] //Find the devices
-	let _devices = [] //Filter the devices data
-
-	if(_userQuery.length > 0){
-		_devicesQuery = database.data.devices.filter(el => //Find the devices
-			el.permissions.filter(el => 
-				el.userId == _userId && //Check if user id is valid
-				(el.type == "admin" || 
-				el.type == "user") //Check users permissions
-			).length > 0 //Check if user has permissions to this device
-		);
-		
-		if(_devicesQuery.length > 0){
-			_devicesQuery.forEach(el => {
-				_devices.push({ //Filter the devices data
-					id: el.id,
-					name: el.settings.name
-				});
-			});
-		}
-	}
-
-	let _valid = _userQuery.length > 0 && _devices.length > 0;
-
-	res.send({
-		correct: (_valid ? true : false),
-		devices: (_valid ? _devices : undefined)
-	}); // Check if there are any results of the query and on this basis send data to user
-})
-
+    let userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == req.body.password);
+    let devicesQuery = [];
+    let devices = [];
+    if (userQuery.length > 0) {
+        devicesQuery = db.data.devices.filter(el => el.permissions.filter(el => el.userId == req.body.userId && (el.type == "admin" || el.type == "user")).length > 0);
+        if (devicesQuery.length > 0) {
+            devicesQuery.forEach(el => {
+                devices.push({
+                    id: el.id,
+                    name: el.settings.name
+                });
+            });
+        }
+    }
+    let valid = userQuery.length > 0 && devices.length > 0;
+    res.send({
+        correct: valid,
+        devices: (valid ? devices : undefined)
+    });
+});
 app.post('/get_settings', (req, res) => {
-	//Data sent by user
-	let _userId = req.body.userId;
-	let _password = req.body.password;
-	let _deviceId = req.body.deviceId;
-
-	let _userQuery = database.data.users.filter(el => //Find the user in db
-		el.id == _userId && //Check if the user id is valid
-		el.password == _password	//Check if the password is valid
-	);
-	let _deviceQuery = []; //Find the device
-	let _permissionsQuery = []; //Find permissions for device
-
-	if(_userQuery.length > 0){
-		_deviceQuery = database.data.devices.filter(el => //Find the device
-			el.id == _deviceId && //Check if the device id is valid
-			el.permissions.filter(el => //Check if user has permission to this device
-				el.userId == _userId
-			)	
-		);
-
-		_permissionsQuery = _deviceQuery[0].permissions.filter(el => //Find permissions for device
-			el.userId == _userId
-		);
-	}
-
-	let _valid = _userQuery.length > 0 && _deviceQuery.length > 0 && _permissionsQuery.length > 0;
-
-
-	res.send({
-		correct: (_valid ? true : false),
-		permissions: (_valid ? _permissionsQuery[0].type : undefined),
-		settingsData: (_valid ? _deviceQuery[0].settings : undefined)
-	}); //Check if there are any results of the query and on this basis send data to user
+    let userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == req.body.password);
+    let deviceQuery = [];
+    let permissionsQuery = [];
+    if (userQuery.length > 0) {
+        deviceQuery = db.data.devices.filter(el => el.id == req.body.deviceId && el.permissions.filter(el => el.userId == req.body.userId).length > 0);
+        if (deviceQuery.length > 0) {
+            permissionsQuery = deviceQuery[0].permissions.filter(el => el.userId == req.body.userId);
+        }
+    }
+    let valid = userQuery.length > 0 && deviceQuery.length > 0 && permissionsQuery.length > 0;
+    res.send({
+        correct: valid,
+        permissions: (valid ? permissionsQuery[0].type : undefined),
+        settingsData: (valid ? deviceQuery[0].settings : undefined)
+    });
 });
-
 app.post('/set_settings', (req, res) => {
-	//Data sent by user
-	let _userId = req.body.userId;
-	let _password = req.body.password;
-	let _deviceId = req.body.deviceId;
-	let _settings = req.body.settingsData;
-
-	let _userQuery = database.data.users.filter(el => //Find the user in db
-		el.id == _userId && //Check if the user id is valid
-		el.password == _password	//Check if the password is valid
-	);
-	let _deviceQuery = []; //Find the device
-
-	if(_userQuery.length > 0){
-		_deviceQuery = database.data.devices.filter(el => //Find the device
-			el.id == _deviceId && //Check if the device id is valid
-			el.permissions.filter(el => //Check if user has permission to this device
-				el.userId == _userId
-			)	
-		);
-
-		if(_deviceQuery.length > 0){
-			database.data.devices.find(el => {
-				return el.id == _deviceId
-			}).settings = _settings; //Change the settings to the new one
-			database.write(); //Save the database
-		}
-	}
-
-	let _valid = _userQuery.length > 0 && _deviceQuery.length > 0;
-
-	res.send({
-		correct: (_valid ? true : false),
-		settingsData: (_valid ? _deviceQuery[0].settings : undefined)
-	}); //Check if there are any results of the query and on this basis send data to user
+    let userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == req.body.password);
+    let deviceQuery = [];
+    if (userQuery.length > 0) {
+        deviceQuery = db.data.devices.filter(el => el.id == req.body.deviceId && el.permissions.filter(el => el.userId == req.body.userId && el.type == "admin").length > 0);
+        if (deviceQuery.length > 0) {
+            db.data.devices.find(el => {
+                return el.id = req.body.deviceId;
+            }).settings = req.body.settingsData;
+            db.write();
+        }
+    }
+    let valid = userQuery.length > 0 && deviceQuery.length > 0;
+    res.send({
+        correct: valid
+    });
 });
-
 app.post('/invite', (req, res) => {
-	//Data sent by user
-	let _userId = req.body.userId;
-	let _password = req.body.password;
-	let _code = req.body.code;
-
-	let _userQuery = database.data.users.filter(el => //Find the user in db
-		el.id == _userId && //Check if the user id is valid
-		el.password == _password	//Check if the password is valid
-	);
-	let _codeQuery = []; //Find the code
-	let _deviceQuery = []; //Find the device
-	let _permissionsQuery = []; //Find the permissions
-
-	if(_userQuery.length > 0){
-		_codeQuery = database.data.invites.filter(el =>  //Find the code
-			el.code == _code
-		);
-
-		if(_codeQuery.length > 0){
-			if(_codeQuery[0].deviceId){
-				_deviceQuery = database.data.devices.filter(el => //Find the device
-					el.id == _codeQuery[0].deviceId
-				);
-
-				if(_deviceQuery.length > 0){
-					_permissionsQuery = _deviceQuery[0].permissions.filter(el => //Check if user already has permissions for this device
-						el.userId == _userId
-					)
-	
-					if(_permissionsQuery.length == 0){
-						_deviceQuery[0].permissions.push({ //Update permissions for a device
-							userId: _userId,
-							type: (_code.toString()[0] == "1" ? "admin" : "user")
-						});
-					}
-	
-					if(_code.toString()[0] == "1"){ //If it is a admin invite, it is immediatly deleted
-						database.data.invites = database.data.invites.filter(el => 
-							el.code != _code
-						);
-						database.write();
-					}else{ //If it is a user invite, it is deleted after 24 hours
-						setTimeout(() => {
-							database.data.invites = database.data.invites.filter(el => 
-								el.code != _code
-							);
-							database.write();
-						}, 1440000)
-					}
-				}
-			}
-		}
-	}
-
-	let _valid = _userQuery.length > 0 && _codeQuery.length > 0 && _deviceQuery.length > 0 && _permissionsQuery.length == 0;
-
-	res.send({
-		correct: (_valid ? true : false),
-		deviceId: (_valid ? _deviceQuery[0].id : undefined)
-	}); //Check if there are any results of the query and on this basis send data to user
+    let userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == req.body.password);
+    let codeQuery = [];
+    let deviceQuery = [];
+    let permissionsQuery = [];
+    if (userQuery.length > 0) {
+        codeQuery = db.data.invites.filter(el => el.code == req.body.code);
+        if (codeQuery.length > 0) {
+            if (codeQuery[0].deviceId) {
+                deviceQuery = db.data.devices.filter(el => el.id == codeQuery[0].deviceId);
+                if (deviceQuery.length > 0) {
+                    permissionsQuery = deviceQuery[0].permissions.filter(el => el.userId == req.body.userId);
+                    if (permissionsQuery.length == 0) {
+                        deviceQuery[0].permissions.push({
+                            userId: req.body.userId,
+                            type: (req.body.code[0] == "1" ? "admin" : "user")
+                        });
+                    }
+                    if (req.body.code[0] == "1") {
+                        db.data.invites = db.data.invites.filter(el => el.code != req.body.code);
+                        db.write();
+                    }
+                    else {
+                        setTimeout(() => {
+                            db.data.invites = db.data.invites.filter(el => { el.code != req.body.code; });
+                            db.write();
+                        }, 1440000);
+                    }
+                }
+            }
+        }
+    }
+    let valid = userQuery.length > 0 && codeQuery.length > 0 && deviceQuery.length > 0 && permissionsQuery.length == 0;
+    res.send({
+        correct: valid,
+        deviceId: (valid ? deviceQuery[0].id : undefined)
+    });
 });
-
 app.post('/verif', (req, res) => {
-	let _username = req.body.username;
-	let _password = req.body.password;
-	let _code = Buffer.from(req.body.code, 'base64');
-
-	let _userQuery = database.data.users.filter(el => //Find the user in db
-		el.username == _username && //Check if the user id is valid
-		el.password == _password	//Check if the password is valid
-	);
-	let _codeQuery = []
-	let _wrong = 0
-
-	if(_userQuery.length > 0){
-		_codeQuery = database.data.invites.filter(el =>  //Find the code
-			el.code == _code &&
-			_userQuery[0].id == el.userId
-		);
-
-		if(_codeQuery.length > 0){
-			if(_codeQuery[0].code.toString()[0] == "2"){
-				database.data.invites = database.data.invites.filter(el =>  //Find the code
-					el.code != _code
-				);
-				database.data.users.find(el => { return el.username == _username }).verified = true
-				database.write();
-			}else{
-				_wrong = 3;
-			}
-		}else{
-			_wrong = 2;
-		}
-	}else{
-		_wrong = 1;
-	}
-
-	let _valid = _userQuery.length > 0 && _codeQuery.length > 0 && _codeQuery[0].code.toString()[0] == "2";
-
-	res.send({
-		correct: (_valid ? true : false),
-		wrong: (!_valid ? _wrong : undefined),
-	})
-})
-
+    let decoded = Buffer.from(req.body.code, 'base64').toString('utf-8');
+    let userQuery = db.data.users.filter(el => el.username == req.body.username && el.password == req.body.password);
+    let codeQuery = [];
+    let wrong = 0;
+    if (userQuery.length > 0) {
+        codeQuery = db.data.invites.filter(el => el.code == decoded && el.id == userQuery[0].id);
+        if (codeQuery.length > 0) {
+            if (codeQuery[0].code[0] == "2") {
+                db.data.invites = db.data.invites.filter(el => el.code != decoded);
+                db.data.users.find(el => { return el.username == req.body.username; }).verified = true;
+                db.write();
+            }
+            else {
+                wrong = 3;
+            }
+        }
+        else {
+            wrong = 2;
+        }
+    }
+    else {
+        wrong = 1;
+    }
+    let valid = userQuery.length > 0 && codeQuery.length > 0 && codeQuery[0].code[0] == "2";
+    res.send({
+        correct: valid,
+        wrong: (valid ? undefined : wrong)
+    });
+});
 app.post('/generate_invite_user', (req, res) => {
-	//Data sent by user
-	let _userId = req.body.userId;
-	let _password = req.body.password;
-	let _deviceId = req.body.deviceId;
-
-	let _userQuery = database.data.users.filter(el => //Find the user in db
-		el.id == _userId && //Check if the user id is valid
-		el.password == _password	//Check if the password is valid
-	);
-	let _deviceQuery = []; //Find the device
-	let _randCode; //Generate random code
-
-	if(_userQuery.length > 0){
-		_deviceQuery = database.data.devices.filter(el => //Find the device
-			el.id = _deviceId &&
-			el.permissions.filter(el => 
-				el.type == "admin" &&
-				el.userId == _userId
-			).length > 0
-		);
-
-		if(_deviceQuery.length > 0){
-			do{ //Until code is unique, generate new code
-				_randCode = '0' + Math.floor(Math.random() * 999999).toString()
-			}while(database.data.invites.filter(el => 
-				el.code == _randCode
-			).length > 0);
-
-			database.data.invites.push({ //Push new code to database
-				deviceId: _deviceId,
-				code: _randCode
-			});
-			database.write(); //Save the db
-		}
-	}
-
-	let _valid = _userQuery.length > 0 && _deviceQuery.length > 0;
-
-	res.send({
-		correct: (_valid ? true : false),
-		code: (_valid ? _randCode : undefined)
-	}); //Send code to user
+    let userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == req.body.password);
+    let deviceQuery = [];
+    let randCode;
+    if (userQuery.length > 0) {
+        deviceQuery = db.data.devices.filter(el => el.id == req.body.deviceId && el.permissions.filter(el => el.type == "admin" && el.userId == req.body.userId).length > 0);
+        if (deviceQuery.length > 0) {
+            do {
+                randCode = '0' + Math.floor(Math.random() * 999999).toString();
+            } while (db.data.invites.filter(el => el.code == randCode).length > 0);
+            db.data.invites.push({
+                id: req.body.deviceId,
+                code: randCode
+            });
+            db.write();
+        }
+    }
+    let valid = userQuery.length > 0 && deviceQuery.length > 0;
+    res.send({
+        correct: valid,
+        code: (valid ? randCode : undefined)
+    });
 });
-
 app.post('/generate_invite_admin', (req, res) => {
-	let _deviceId = 0; //Generate device id
-	let _randCode; //Generate invite code
-
-	do{
-		_deviceId++; // Generate new ids until id is not taken
-	}while(database.data.devices.filter(el =>
-		el.id == _deviceId
-	).length > 0);
-
-	database.data.devices.push({ //Push new device to db
-		id: _deviceId,
-		permissions: [],
-		settings: {
-			unit: "metric",
-			name: "New Furiko"
-		}
-	});
-
-	do{ //Until code is unique, generate new code
-		_randCode = '1' + Math.floor(Math.random() * 999999).toString()
-	}while(database.data.invites.filter(el => 
-		el.code == _randCode
-	).length > 0);
-
-	database.data.invites.push({ //Push new code to database
-		deviceId: _deviceId,
-		code: _randCode
-	});
-	database.write(); //Save the db
-
-	res.send({
-		correct: true,
-		code: _randCode,
-		deviceId: _deviceId
-	}); //Send data to device
+    let deviceId = 0;
+    let randCode;
+    do {
+        deviceId++;
+    } while (db.data.devices.filter(el => el.id == deviceId).length > 0);
+    db.data.devices.push({
+        id: deviceId,
+        permissions: [],
+        settings: {
+            unit: "metric",
+            name: "New Furiko"
+        }
+    });
+    do {
+        randCode = '1' + Math.floor(Math.random() * 999999).toString();
+    } while (db.data.invites.filter(el => el.code == randCode).length > 0);
+    db.data.invites.push({
+        id: deviceId,
+        code: randCode
+    });
+    db.write();
+    res.send({
+        correct: true,
+        code: randCode,
+        deviceId: deviceId
+    });
 });
-
-app.post('/set_data', (req, res) => {
-	//Data sent by user
-	let _deviceId = req.body.deviceId;
-	let _data = req.body.data;
-	
-	let _deviceQuery = database.data.devices.filter(el => //Find the device
-		el.id == _deviceId	
-	);
-	
-	if(_deviceQuery.length > 0) {
-		if(_deviceQuery[0].data.length > 75){ //Check if there are too many data entries
-			database.data.devices.find(el => { return el.id == _deviceId }).dataFromDevice.shift();//Remove the excess
-		}
-
-		database.data.devices.find(el => { return el.id == _deviceId }).dataFromDevice.push(_data); //Push the data
-		database.write(); //Save the db
-	}
-
-	let _valid = _deviceQuery.length > 0
-
-	res.send({
-		correct: (_valid ? true : false)
-	}); //Send information about correctness of the process
+app.post('/create_session', (req, res) => {
+    let userQuery = [];
+    let deviceQuery = [];
+    let wrong = 0;
+    let sessionId;
+    if (req.body.userId && req.body.password && req.body.deviceId && req.body.typeOfGraph && req.body.name) {
+        userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == req.body.password);
+        if (userQuery.length > 0) {
+            deviceQuery = db.data.devices.filter(el => el.id == req.body.deviceId && el.permissions.filter(el => el.type == "admin" && el.userId == req.body.userId).length > 0);
+            if (deviceQuery.length > 0) {
+                sessionId = 0;
+                do {
+                    sessionId++;
+                } while (db.data.sessions.filter(el => el.sessionId == sessionId).length > 0);
+                let dataToPush = {
+                    deviceId: req.body.deviceId,
+                    sessionId: sessionId,
+                    typeOfGraph: req.body.typeOfGraph,
+                    name: req.body.name,
+                    data: []
+                };
+                db.data.sessions.push(dataToPush);
+                db.write();
+            }
+            else {
+                wrong = 3;
+            }
+        }
+        else {
+            wrong = 2;
+        }
+    }
+    else {
+        wrong = 1;
+    }
+    let valid = req.body.userId && req.body.password && req.body.deviceId && req.body.typeOfGraph && req.body.name && userQuery.length > 0 && deviceQuery.length > 0;
+    res.send({
+        correct: valid,
+        wrong: (valid ? undefined : wrong),
+        sessionId: (valid ? sessionId : undefined)
+    });
 });
-
-app.post('/get_data', (req, res) => {
-	//Data sent by user
-	let _userId = req.body.userId;
-	let _password = req.body.password;
-	let _deviceId = req.body.deviceId;
-
-	let _userQuery = database.data.users.filter(el => //Find the user in db
-		el.id == _userId && //Check if the user id is valid
-		el.password == _password	//Check if the password is valid
-	);
-	let _deviceQuery = []; //Find the device
-	let _dataQuery; //Get the data
-
-	if(_userQuery.length > 0){
-		_deviceQuery = database.data.devices.filter(el => //Find the device
-			el.id = _deviceId &&
-			el.permissions.filter(el => 
-				el.userId == _userId
-			).length > 0
-		);
-
-		if(_deviceQuery.length > 0){
-			_dataQuery = _deviceQuery[0].data.slice(-1)[0]; // Get data from db
-		}
-	}
-
-	let _valid = _userQuery.length > 0 && _deviceQuery.length > 0 && _dataQuery != undefined;
-	res.send({
-		correct: (_valid ? true : false),
-		data: (_valid ? _dataQuery : undefined)
-	}); //Send code to user
-})
-
-app.post('/create_acc', async (req, res) => {
-	//Data sent by user
-	let _username = req.body.username;
-	let _password = req.body.password;
-	let _confPassword = req.body.confPassword;
-	let _email = req.body.email;
-
-	let _query = [];
-	let _wrong = 0;
-	let _userId;
-
-	if(_username && _password && _confPassword && _email){
-		if(_password == _confPassword){
-			_query = database.data.users.filter(el => 
-				el.username == _username ||
-				el.email == _email
-			)
-	
-			if(_query.length == 0){
-				_userId = 0;
-	
-				do{
-					_userId++; // Generate new ids until id is not taken
-				}while(database.data.users.filter(el =>
-					el.id == _userId
-				).length > 0);
-	
-				database.data.users.push({
-					id: _userId,
-					username: _username,
-					password: _password,
-					email: _email,
-					verified: false
-				})
-
-				let _randCode;
-
-				do{ //Until code is unique, generate new code
-					_randCode = '2' + Math.floor(Math.random() * 999999).toString()
-				}while(database.data.invites.filter(el => 
-					el.code == _randCode
-				).length > 0);
-
-				database.data.invites.push({
-					userId: _userId,
-					code: _randCode
-				})
-
-				database.write();
-
-				let _transporter = nodemailer.createTransport({
-					host: "smtp.gmail.com",
-					port: 587,
-					secure: false,
-					auth: {
-						user: process.env.MAILUSER,
-						pass: process.env.MAILPASS
-					}
-				});
-				
-				await _transporter.sendMail({
-					to: _email, // list of receivers
-					subject: "Code ✔", // Subject line
-					html: `Code: <a href="http://localhost:1503/?code=${Buffer.from(_randCode).toString("base64")}">http://localhost:1503/?code=${Buffer.from(_randCode).toString("base64")}</a>`, // html body
-				});
-			}else{
-				_wrong = 2;
-			}
-		}else{
-			_wrong = 1;
-		}
-	}else{
-		_wrong = 3;
-	}
-
-	let _valid = _username && _password && _confPassword && _email && _password == _confPassword && _query.length == 0;
-	res.send({
-		correct: (_valid ? true : false),
-		wrong: (!_valid ? _wrong : undefined),
-		userId: (_valid ? _userId : undefined)
-	});
-})
-
+app.post('/end_session', (req, res) => {
+    let userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == req.body.password);
+    let deviceQuery = [];
+    let sessionQueryIndex;
+    if (userQuery.length > 0) {
+        deviceQuery = db.data.devices.filter(el => el.id == req.body.deviceId && el.permissions.filter(el => el.type == "admin" && el.userId == req.body.userId).length > 0);
+        if (deviceQuery.length > 0) {
+            sessionQueryIndex = db.data.sessions.findIndex(el => el.sessionId == req.body.sessionId && el.typeOfGraph == req.body.typeOfGraph && el.deviceId == req.body.deviceId && el.data.length == 0);
+            if (sessionQueryIndex >= 0) {
+                db.data.sessions[sessionQueryIndex].data = req.body.data;
+                db.write();
+            }
+        }
+    }
+    let valid = userQuery.length > 0 && deviceQuery.length > 0 && sessionQueryIndex >= 0;
+    res.send({
+        correct: valid
+    });
+});
+app.post('/get_sessions', (req, res) => {
+    let userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == req.body.password);
+    let deviceQueryUser = [];
+    let deviceQueryAdmin = [];
+    let sessionQuery = [];
+    let sessionsList = [];
+    if (userQuery.length > 0) {
+        deviceQueryAdmin = db.data.devices.filter(el => el.id == req.body.deviceId && el.permissions.filter(el => el.type == "admin" && el.userId == req.body.userId).length > 0);
+        deviceQueryUser = db.data.devices.filter(el => el.id == req.body.deviceId && el.permissions.filter(el => el.type == "user" && el.userId == req.body.userId).length > 0);
+        if (deviceQueryAdmin.length > 0) {
+            sessionQuery = db.data.sessions.filter(el => el.typeOfGraph == req.body.typeOfGraph && el.deviceId == req.body.deviceId);
+            sessionQuery.forEach(el => {
+                sessionsList.push({
+                    sessionsList: el.sessionId,
+                    typeOfGraph: el.typeOfGraph,
+                    name: el.name
+                });
+            });
+        }
+        if (deviceQueryUser.length > 0) {
+            sessionQuery = db.data.sessions.filter(el => el.typeOfGraph == req.body.typeOfGraph && el.deviceId == req.body.deviceId && el.data.length > 0);
+            sessionQuery.forEach(el => {
+                sessionsList.push({
+                    sessionId: el.sessionId,
+                    typeOfGraph: el.typeOfGraph,
+                    name: el.name
+                });
+            });
+        }
+    }
+    let valid = userQuery.length > 0 && (deviceQueryAdmin.length > 0 || deviceQueryUser.length > 0);
+    res.send({
+        correct: valid,
+        sessions: (valid ? sessionsList : undefined)
+    });
+});
+app.post('/get_session', (req, res) => {
+    let userQuery = db.data.users.filter(el => el.id == req.body.userId && el.password == el.password);
+    let deviceQuery = [];
+    let sessionQuery = [];
+    let sessionId;
+    let typeOfGraph;
+    let name;
+    let data;
+    if (userQuery.length > 0) {
+        deviceQuery = db.data.devices.filter(el => el.id == req.body.deviceId && (el.permissions.filter(el => el.type == "admin" && el.userId == req.body.userId) || el.permissions.filter(el => el.type == "user" && el.userId == req.body.userId)));
+        if (deviceQuery.length > 0) {
+            sessionQuery = db.data.sessions.filter(el => el.deviceId == req.body.deviceId && el.sessionId == req.body.sessionId && el.typeOfGraph == req.body.typeOfGraph);
+            if (sessionQuery.length > 0) {
+                sessionId = sessionQuery[0].sessionId;
+                typeOfGraph = sessionQuery[0].typeOfGraph;
+                name = sessionQuery[0].name;
+                data = sessionQuery[0].data;
+            }
+        }
+    }
+    let valid = userQuery.length > 0 && deviceQuery.length > 0 && sessionQuery.length > 0;
+    res.send({
+        correct: valid,
+        sessionId: (valid ? sessionId : undefined),
+        typeOfGraph: (valid ? typeOfGraph : undefined),
+        name: (valid ? name : undefined),
+        data: (valid ? data : undefined)
+    });
+});
+app.post('/create_acc', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    let query = [];
+    let wrong = 0;
+    let userId = 0;
+    if (req.body.username && req.body.password && req.body.confPassword && req.body.email) {
+        if (req.body.password == req.body.confPassword) {
+            query = db.data.users.filter(el => el.username == req.body.username || el.email == req.body.email);
+            if (query.length == 0) {
+                do {
+                    userId++;
+                } while (db.data.users.filter(el => el.id == userId).length > 0);
+                db.data.users.push({
+                    id: userId,
+                    username: req.body.username,
+                    password: req.body.password,
+                    email: req.body.email,
+                    verified: false
+                });
+                let randCode;
+                do {
+                    randCode = '2' + Math.floor(Math.random() * 999999).toString();
+                } while (db.data.invites.filter(el => el.code == randCode).length > 0);
+                db.data.invites.push({
+                    id: userId,
+                    code: randCode
+                });
+                db.write();
+                let transporter = nodemailer.createTransport({
+                    host: "smtp.gmail.com",
+                    port: 587,
+                    secure: false,
+                    auth: {
+                        user: process.env.MAILUSER,
+                        pass: process.env.MAILPASS
+                    }
+                });
+                yield transporter.sendMail({
+                    to: req.body.email,
+                    subject: "Code ✔",
+                    html: `Code: <a href="http://localhost:1503/?code=${Buffer.from(randCode).toString("base64")}">http://localhost:1503/?code=${Buffer.from(randCode).toString("base64")}</a>`,
+                });
+            }
+            else {
+                wrong = 1;
+            }
+        }
+        else {
+            wrong = 2;
+        }
+    }
+    else {
+        wrong = 3;
+    }
+    let valid = req.body.username && req.body.password && req.body.confPassword && req.body.email && req.body.password == req.body.confPassword && query.length == 0;
+    res.send({
+        correct: valid,
+        wrong: (valid ? undefined : wrong),
+        userId: (valid ? userId : undefined)
+    });
+}));
 app.listen(port, () => {
-	console.log(`App is running on port ${port}`)
-}) //Start app
+    console.log(`App is running on port ${port}`);
+});
